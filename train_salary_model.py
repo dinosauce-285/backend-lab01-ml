@@ -143,7 +143,7 @@ for col in numerical_cols_to_scale:
         scaler.fit(X_raw[[col]])
         scaler_dict[col] = scaler
         X_scaled[col] = scaler.transform(X_raw[[col]])
-        print(f"  ✓ {col}: mean={scaler.mean_[0]:.2f}, std={scaler.scale_[0]:.2f}")
+        print(f"  {col}: mean={scaler.mean_[0]:.2f}, std={scaler.scale_[0]:.2f}")
 
 X = X_scaled
 print(f"\nFinal X shape: {X.shape}")
@@ -204,10 +204,13 @@ result_slr = evaluate_model(
 )
 all_results.append(result_slr)
 
-# Model 2: Multiple Linear Regression
+# Model 2: Multiple Linear Regression (3 features)
+X_train_mlr = X_train[['Age', 'Years of Experience', 'Education_Encoded']]
+X_test_mlr = X_test[['Age', 'Years of Experience', 'Education_Encoded']]
+
 model_mlr = LinearRegression()
 result_mlr = evaluate_model(
-    model_mlr, X_train, y_train, X_test, y_test,
+    model_mlr, X_train_mlr, y_train, X_test_mlr, y_test,
     "Multiple Linear Regression"
 )
 all_results.append(result_mlr)
@@ -285,11 +288,11 @@ joblib.dump(scaler_dict, 'scaler_dict.pkl')
 print("\n" + "="*70)
 print("SAVED FILES")
 print("="*70)
-print("✓ best_salary_model.pkl")
-print(f"✓ education_map.pkl ({len(education_map)} levels: {list(education_map.keys())})")
-print(f"✓ top_n_jobs.pkl ({len(top_n_jobs)} jobs)")
-print(f"✓ model_features_order.pkl ({len(feature_columns)} features)")
-print(f"✓ scaler_dict.pkl ({len(scaler_dict)} scalers)")
+print("best_salary_model.pkl")
+print(f"education_map.pkl ({len(education_map)} levels: {list(education_map.keys())})")
+print(f"top_n_jobs.pkl ({len(top_n_jobs)} jobs)")
+print(f"model_features_order.pkl ({len(feature_columns)} features)")
+print(f"scaler_dict.pkl ({len(scaler_dict)} scalers)")
 
 print("\n" + "="*70)
 print("SCALER VERIFICATION (IMPORTANT)")
