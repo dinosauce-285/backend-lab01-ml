@@ -30,8 +30,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend source code
 COPY app.py .
-COPY utils.py .        # nếu có
-COPY preprocess.py .   # nếu có
+
 
 # Copy trained models from stage 1
 COPY --from=trainer /app/*.pkl ./
