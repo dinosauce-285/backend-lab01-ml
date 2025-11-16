@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Salary Prediction Model Training
-Chỉ giữ phần training và lưu model, bỏ tất cả visualization
-"""
-
 # ============================================================================
 # Import Libraries
 # ============================================================================
@@ -13,7 +7,7 @@ import joblib
 import warnings
 from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
 from sklearn.linear_model import LinearRegression, Ridge, RidgeCV, Lasso, LassoCV
 
 warnings.filterwarnings('ignore')
@@ -215,7 +209,74 @@ result_mlr = evaluate_model(
 )
 all_results.append(result_mlr)
 
-# Model 3: Ridge Regression
+# Model 3: Polynomial Regression (Degree 2)
+print("\n" + "="*70)
+print("Polynomial Regression (Degree 2)")
+print("="*70)
+
+# Chuẩn bị X ban đầu cho Polynomial
+X_poly2_base = df_clean.drop(columns=['Salary', 'Job Title', 'Gender', 'Education Level'], errors='ignore')
+X_poly2_base['Education_Encoded'] = df_clean['Education Level'].map(education_map)
+
+# Thêm dummy variables cho Gender
+gender_dummies_poly = pd.get_dummies(df_clean['Gender'], prefix='Gender', drop_first=True)
+X_poly2_base = pd.concat([X_poly2_base, gender_dummies_poly], axis=1)
+
+# Gộp Job Title và tạo dummy variables
+X_poly2_base['Job Title Grouped'] = np.where(
+    df_clean['Job Title'].isin(top_n_jobs),
+    df_clean['Job Title'],
+    'Other'
+)
+job_dummies_poly = pd.get_dummies(X_poly2_base['Job Title Grouped'], prefix='Job', drop_first=True)
+X_poly2_base = pd.concat([X_poly2_base, job_dummies_poly], axis=1)
+X_poly2_base = X_poly2_base.drop(columns=['Job Title Grouped'], errors='ignore').dropna()
+
+# Tạo features đa thức bậc 2 cho Age và Years of Experience
+poly2_transformer = PolynomialFeatures(degree=2, include_bias=False)
+poly_num_features = poly2_transformer.fit_transform(X_poly2_base[['Age', 'Years of Experience']])
+poly_num_feature_names = poly2_transformer.get_feature_names_out(['Age', 'Years of Experience'])
+
+# DataFrame cho các features đa thức
+X_poly2_num = pd.DataFrame(poly_num_features, columns=poly_num_feature_names, index=X_poly2_base.index)
+
+# Kết hợp: loại bỏ các cột gốc và thêm các cột đa thức
+X_poly2 = X_poly2_base.drop(columns=['Age', 'Years of Experience']).copy()
+X_poly2 = pd.concat([X_poly2, X_poly2_num], axis=1)
+
+# Scaling các cột số
+numerical_cols_for_poly_scaled = [col for col in X_poly2.columns
+                                  if X_poly2[col].dtype in ['int64', 'float64']
+                                  and not col.startswith('Gender_')
+                                  and not col.startswith('Job_')
+                                  and col != 'Education_Encoded']
+
+scaler_poly2 = StandardScaler()
+X_poly2_scaled = X_poly2.copy()
+for col in numerical_cols_for_poly_scaled:
+    X_poly2_scaled[col] = scaler_poly2.fit_transform(X_poly2[[col]])
+
+# Đảm bảo y khớp index với X
+y_poly2 = df_clean.loc[X_poly2_scaled.index, 'Salary']
+
+# Chia dữ liệu train/test
+X_train_poly2, X_test_poly2, y_train_poly2, y_test_poly2 = train_test_split(
+    X_poly2_scaled, y_poly2, test_size=0.2, random_state=42
+)
+
+# Huấn luyện mô hình
+model_poly2 = LinearRegression()
+result_poly2 = evaluate_model(model_poly2, X_train_poly2, y_train_poly2,
+                              X_test_poly2, y_test_poly2, "Polynomial Regression (Degree 2)")
+
+# Cross-Validation 5-fold
+cv_scores_poly2 = cross_val_score(model_poly2, X_poly2_scaled, y_poly2, cv=5, scoring='r2', n_jobs=-1)
+print(f"\n  R² trung bình (5-Fold CV): {cv_scores_poly2.mean():.4f} (+/- {cv_scores_poly2.std():.4f})")
+result_poly2['CV_R2_Mean'] = cv_scores_poly2.mean()
+result_poly2['CV_R2_Std'] = cv_scores_poly2.std()
+all_results.append(result_poly2)
+
+# Model 4: Ridge Regression
 alphas = np.logspace(-3, 3, 100)
 ridge_cv = RidgeCV(alphas=alphas, cv=5, scoring='neg_mean_squared_error')
 ridge_cv.fit(X_train, y_train)
@@ -226,7 +287,7 @@ result_ridge = evaluate_model(
 )
 all_results.append(result_ridge)
 
-# Model 4: Lasso Regression
+# Model 5: Lasso Regression
 lasso_cv = LassoCV(
     alphas=np.logspace(-4, 1, 100),
     cv=5,
@@ -275,6 +336,11 @@ print("\n[7/7] Saving model and preprocessing objects...")
 # Determine feature columns based on best model
 if best_model_name == "Simple Linear Regression":
     feature_columns = ['Years of Experience']
+elif best_model_name == "Polynomial Regression (Degree 2)":
+    feature_columns = list(X_poly2_scaled.columns)
+    # Lưu thêm poly transformer và scaler cho poly model
+    joblib.dump(poly2_transformer, 'poly2_transformer.pkl')
+    joblib.dump(scaler_poly2, 'scaler_poly2.pkl')
 else:
     feature_columns = list(X.columns)
 
@@ -284,15 +350,21 @@ joblib.dump(education_map, 'education_map.pkl')
 joblib.dump(top_n_jobs, 'top_n_jobs.pkl')
 joblib.dump(feature_columns, 'model_features_order.pkl')
 joblib.dump(scaler_dict, 'scaler_dict.pkl')
+joblib.dump(best_model_name, 'best_model_name.pkl')
 
 print("\n" + "="*70)
 print("SAVED FILES")
 print("="*70)
 print("best_salary_model.pkl")
+print("best_model_name.pkl")
 print(f"education_map.pkl ({len(education_map)} levels: {list(education_map.keys())})")
 print(f"top_n_jobs.pkl ({len(top_n_jobs)} jobs)")
 print(f"model_features_order.pkl ({len(feature_columns)} features)")
 print(f"scaler_dict.pkl ({len(scaler_dict)} scalers)")
+
+if best_model_name == "Polynomial Regression (Degree 2)":
+    print("poly2_transformer.pkl")
+    print("scaler_poly2.pkl")
 
 print("\n" + "="*70)
 print("SCALER VERIFICATION (IMPORTANT)")
@@ -301,3 +373,7 @@ for col, scaler in scaler_dict.items():
     print(f"  {col}:")
     print(f"    mean = {scaler.mean_[0]:.2f}")
     print(f"    std  = {scaler.scale_[0]:.2f}")
+
+print("\n" + "="*70)
+print("TRAINING COMPLETE")
+print("="*70)
