@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Salary Prediction Model Training
-Chỉ giữ phần training và lưu model, bỏ tất cả visualization
-"""
-
 # ============================================================================
 # Import Libraries
 # ============================================================================

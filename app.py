@@ -140,16 +140,13 @@ def predict_salary():
         elif best_model_name == "Polynomial Regression (Degree 2)":
             print("\n🔵 Using Polynomial Regression (Degree 2)")
             
-            # Bước 1: Tạo base dataframe
             base_data = {
                 'Education_Encoded': [float(edu_encoded)]
             }
             
-            # Thêm Gender dummies
             base_data['Gender_Male'] = [1.0 if gender == 'Male' else 0.0]
             base_data['Gender_Other'] = [1.0 if gender == 'Other' else 0.0]
             
-            # Thêm Job dummies
             job_grouped = job if job in top_n_jobs else 'Other'
             for col in FEATURE_COLUMNS_ORDER:
                 if col.startswith('Job_'):
@@ -158,15 +155,12 @@ def predict_salary():
             
             input_df = pd.DataFrame(base_data)
             
-            # Bước 2: Tạo polynomial features từ Age và Years of Experience
             poly_input = np.array([[age, years_exp]])
             poly_features = poly2_transformer.transform(poly_input)
             poly_feature_names = poly2_transformer.get_feature_names_out(['Age', 'Years of Experience'])
             
-            # Tạo DataFrame cho polynomial features
             poly_df = pd.DataFrame(poly_features, columns=poly_feature_names)
             
-            # Bước 3: Scaling các polynomial features
             for col in poly_df.columns:
                 if col in scaler_poly2_dict:
                     original_val = poly_df.loc[0, col]
@@ -174,21 +168,16 @@ def predict_salary():
                     poly_df.loc[0, col] = scaled_val
                     print(f"  Poly {col}: {original_val:.2f} -> {scaled_val:.4f}")
             
-            # Bước 4: Kết hợp tất cả features
             input_df = pd.concat([input_df, poly_df], axis=1)
             
-            # Đảm bảo đúng thứ tự cột
             input_df = input_df[FEATURE_COLUMNS_ORDER]
             
         else:
-            # Multiple/Ridge/Lasso Regression
-            print(f"\n🔵 Using {best_model_name}")
+            print(f"\nUsing {best_model_name}")
             
-            # Tạo DataFrame với đúng cột và thứ tự
             input_df = pd.DataFrame(columns=FEATURE_COLUMNS_ORDER)
             input_df.loc[0] = 0.0
             
-            # Gán giá trị base
             if 'Education_Encoded' in input_df.columns:
                 input_df.loc[0, 'Education_Encoded'] = float(edu_encoded)
             if 'Age' in input_df.columns:
@@ -196,7 +185,6 @@ def predict_salary():
             if 'Years of Experience' in input_df.columns:
                 input_df.loc[0, 'Years of Experience'] = years_exp
             
-            # Polynomial features - SỬA TÊN CHO KHỚP
             if 'Age_squared' in input_df.columns:
                 input_df.loc[0, 'Age_squared'] = age ** 2
             if 'Exp_squared' in input_df.columns:
@@ -204,7 +192,6 @@ def predict_salary():
             if 'Education_x_Exp' in input_df.columns:
                 input_df.loc[0, 'Education_x_Exp'] = edu_encoded * years_exp
             
-            # Scaling
             print("\nScaling features:")
             for col in scaler_dict.keys():
                 if col in input_df.columns:
@@ -213,13 +200,11 @@ def predict_salary():
                     input_df.loc[0, col] = scaled_val
                     print(f"  {col}: {original_val:.2f} -> {scaled_val:.4f}")
             
-            # Gender encoding
             if 'Gender_Male' in input_df.columns:
                 input_df.loc[0, 'Gender_Male'] = 1.0 if gender == 'Male' else 0.0
             if 'Gender_Other' in input_df.columns:
                 input_df.loc[0, 'Gender_Other'] = 1.0 if gender == 'Other' else 0.0
             
-            # Job encoding
             job_grouped = job if job in top_n_jobs else 'Other'
             print(f"\nJob encoding: '{job}' -> '{job_grouped}'")
             for col in input_df.columns:
@@ -237,13 +222,13 @@ def predict_salary():
         prediction = model.predict(input_df)
         result = round(float(prediction[0]), 2)
         
-        print(f"\n✓ Prediction: ${result:,.2f}")
+        print(f"\nPrediction: ${result:,.2f}")
         print("="*70 + "\n")
         
         return jsonify({'predicted_salary': result})
 
     except Exception as e:
-        print(f"\n✗ ERROR: {str(e)}")
+        print(f"\nERROR: {str(e)}")
         traceback.print_exc()
         print("="*70 + "\n")
         return jsonify({'error': f'Prediction error: {str(e)}'}), 500
