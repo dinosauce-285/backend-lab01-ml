@@ -1,3 +1,9 @@
+# -*- coding: utf-8 -*-
+"""
+Salary Prediction Model Training
+Chỉ giữ phần training và lưu model, bỏ tất cả visualization
+"""
+
 # ============================================================================
 # Import Libraries
 # ============================================================================
@@ -244,17 +250,21 @@ X_poly2_num = pd.DataFrame(poly_num_features, columns=poly_num_feature_names, in
 X_poly2 = X_poly2_base.drop(columns=['Age', 'Years of Experience']).copy()
 X_poly2 = pd.concat([X_poly2, X_poly2_num], axis=1)
 
-# Scaling các cột số
+# Scaling các cột số - FIXED: Tạo scaler riêng cho từng cột
 numerical_cols_for_poly_scaled = [col for col in X_poly2.columns
                                   if X_poly2[col].dtype in ['int64', 'float64']
                                   and not col.startswith('Gender_')
                                   and not col.startswith('Job_')
                                   and col != 'Education_Encoded']
 
-scaler_poly2 = StandardScaler()
+# Tạo dictionary để lưu scaler cho từng cột
+scaler_poly2_dict = {}
 X_poly2_scaled = X_poly2.copy()
 for col in numerical_cols_for_poly_scaled:
-    X_poly2_scaled[col] = scaler_poly2.fit_transform(X_poly2[[col]])
+    scaler = StandardScaler()
+    X_poly2_scaled[col] = scaler.fit_transform(X_poly2[[col]])
+    scaler_poly2_dict[col] = scaler
+    print(f"  Poly {col}: mean={scaler.mean_[0]:.2f}, std={scaler.scale_[0]:.2f}")
 
 # Đảm bảo y khớp index với X
 y_poly2 = df_clean.loc[X_poly2_scaled.index, 'Salary']
@@ -338,9 +348,11 @@ if best_model_name == "Simple Linear Regression":
     feature_columns = ['Years of Experience']
 elif best_model_name == "Polynomial Regression (Degree 2)":
     feature_columns = list(X_poly2_scaled.columns)
-    # Lưu thêm poly transformer và scaler cho poly model
+    # Lưu thêm poly transformer và scaler dict cho poly model
     joblib.dump(poly2_transformer, 'poly2_transformer.pkl')
-    joblib.dump(scaler_poly2, 'scaler_poly2.pkl')
+    joblib.dump(scaler_poly2_dict, 'scaler_poly2_dict.pkl')
+    print(f"  Polynomial features: {len(feature_columns)} columns")
+    print(f"  Polynomial scalers: {len(scaler_poly2_dict)} scalers")
 else:
     feature_columns = list(X.columns)
 
@@ -364,7 +376,10 @@ print(f"scaler_dict.pkl ({len(scaler_dict)} scalers)")
 
 if best_model_name == "Polynomial Regression (Degree 2)":
     print("poly2_transformer.pkl")
-    print("scaler_poly2.pkl")
+    print(f"scaler_poly2_dict.pkl ({len(scaler_poly2_dict)} scalers)")
+    print("\nPolynomial Scalers:")
+    for col, scaler in scaler_poly2_dict.items():
+        print(f"  {col}: mean={scaler.mean_[0]:.2f}, std={scaler.scale_[0]:.2f}")
 
 print("\n" + "="*70)
 print("SCALER VERIFICATION (IMPORTANT)")
